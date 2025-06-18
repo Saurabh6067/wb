@@ -7,20 +7,44 @@ function App() {
   const [username, setUsername] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(true);
+  const [error, setError] = useState('');
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
 
+  // Safe localStorage functions with error handling
+  const saveToLocalStorage = (key, data) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+      setError('Unable to save messages. Please check your browser settings.');
+    }
+  };
+
+  const loadFromLocalStorage = (key) => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error('Error loading from localStorage:', error);
+      setError('Unable to load saved messages. Please check your browser settings.');
+      return null;
+    }
+  };
+
   // Load messages from localStorage on component mount
   useEffect(() => {
-    const savedMessages = localStorage.getItem('chatMessages');
-    if (savedMessages) {
-      setMessages(JSON.parse(savedMessages));
+    const savedMessages = loadFromLocalStorage('chatMessages');
+    if (savedMessages && Array.isArray(savedMessages)) {
+      setMessages(savedMessages);
     }
   }, []);
 
   // Save messages to localStorage whenever messages change
   useEffect(() => {
-    localStorage.setItem('chatMessages', JSON.stringify(messages));
+    if (messages.length > 0) {
+      saveToLocalStorage('chatMessages', messages);
+    }
   }, [messages]);
 
   // Scroll to bottom when new messages arrive
@@ -58,6 +82,7 @@ function App() {
     e.preventDefault();
     if (username.trim()) {
       setShowUsernameModal(false);
+      setError(''); // Clear any previous errors
     }
   };
 
@@ -71,30 +96,47 @@ function App() {
 
       // Add own message to the chat
       const ownMessage = {
-        id: Date.now(),
+        id: Date.now() + Math.random(), // Ensure unique ID
         text: inputMessage.trim(),
         username: username,
         timestamp: new Date().toISOString(),
         isOwn: true
       };
-      setMessages(prev => [...prev, ownMessage]);
+      
+      setMessages(prev => {
+        const newMessages = [...prev, ownMessage];
+        // Immediately save to localStorage
+        saveToLocalStorage('chatMessages', newMessages);
+        return newMessages;
+      });
 
       // Send message through WebSocket
       wsRef.current.send(JSON.stringify(messageData));
       setInputMessage('');
+      setError(''); // Clear any previous errors
     }
   };
 
   const clearChat = () => {
     setMessages([]);
-    localStorage.removeItem('chatMessages');
+    try {
+      localStorage.removeItem('chatMessages');
+      setError('');
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+      setError('Unable to clear messages. Please refresh the page.');
+    }
   };
 
   const formatTimestamp = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+    try {
+      return new Date(timestamp).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    } catch (error) {
+      return 'Invalid time';
+    }
   };
 
   if (showUsernameModal) {
@@ -134,6 +176,13 @@ function App() {
             Clear Chat
           </button>
         </div>
+
+        {error && (
+          <div className="error-message">
+            {error}
+            <button onClick={() => setError('')} className="error-close">×</button>
+          </div>
+        )}
 
         <div className="messages-container">
           {messages.length === 0 ? (
