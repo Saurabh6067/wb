@@ -56,25 +56,55 @@ function App() {
   useEffect(() => {
     if (!username) return;
 
-    // For demo purposes, we'll simulate WebSocket with a mock server
-    // In a real app, you would connect to an actual WebSocket server
-    const mockWebSocket = {
-      send: (data) => {
-        // Simulate message broadcast - removed automatic message generation
-        console.log('Message sent:', data);
-      },
-      close: () => {
-        setIsConnected(false);
+    // Connect to PieSocket demo WebSocket server
+    const ws = new window.WebSocket(
+      'wss://demo.piesocket.com/v3/channel_1?api_key=DEMOKEY&notify_self'
+    );
+
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setIsConnected(true);
+    };
+
+    ws.onclose = () => {
+      setIsConnected(false);
+    };
+
+    ws.onerror = (err) => {
+      setError('WebSocket error. Please try again later.');
+      setIsConnected(false);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // Ignore own message if already added
+        if (data.username && data.text) {
+          // Prevent duplicate own message (since PieSocket echoes to sender)
+          if (data.username === username && data.text === inputMessage.trim()) {
+            return;
+          }
+          const newMsg = {
+            id: Date.now() + Math.random(),
+            text: data.text,
+            username: data.username,
+            timestamp: new Date().toISOString(),
+            isOwn: data.username === username
+          };
+          setMessages(prev => {
+            const newMessages = [...prev, newMsg];
+            saveToLocalStorage('chatMessages', newMessages);
+            return newMessages;
+          });
+        }
+      } catch (e) {
+        // Ignore non-JSON messages
       }
     };
 
-    wsRef.current = mockWebSocket;
-    setIsConnected(true);
-
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      ws.close();
     };
   }, [username]);
 
