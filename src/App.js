@@ -64,19 +64,23 @@ function App() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      console.log('WebSocket connected');
       setIsConnected(true);
     };
 
     ws.onclose = () => {
+      console.log('WebSocket disconnected');
       setIsConnected(false);
     };
 
     ws.onerror = (err) => {
+      console.error('WebSocket error:', err);
       setError('WebSocket error. Please try again later.');
       setIsConnected(false);
     };
 
     ws.onmessage = (event) => {
+      console.log('WebSocket message received:', event.data);
       try {
         const data = JSON.parse(event.data);
         if (data.username && data.text) {
@@ -136,6 +140,7 @@ function App() {
       });
 
       // Send message through WebSocket
+      console.log('WebSocket sending message:', JSON.stringify(messageData));
       wsRef.current.send(JSON.stringify(messageData));
       setInputMessage('');
       setError(''); // Clear any previous errors
