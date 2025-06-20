@@ -79,12 +79,7 @@ function App() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        // Ignore own message if already added
         if (data.username && data.text) {
-          // Prevent duplicate own message (since PieSocket echoes to sender)
-          if (data.username === username && data.text === inputMessage.trim()) {
-            return;
-          }
           const newMsg = {
             id: Date.now() + Math.random(),
             text: data.text,
